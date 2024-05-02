@@ -1,0 +1,121 @@
+---
+title: "PIFSC_NOAAships"
+author: "Phoebe.Woodworth-Jefcoats@noaa.gov"
+date: "2024-03-01"
+output: html_document
+---
+
+# PIFSC use of NOAA ships - emissions inventory
+This document describes the methodology used to calculate the carbon footprint of PIFSC's use of NOAA's ships.
+
+### Data gathering
+Data on fuel type and use, as well as miles traveled, were provided by the ships' operations officers.  Each ship provided slightly different data.  Full details are retained in copies of the emails accompanying the data (in our Google Drive).  Relevant details are included here.
+
+Data provided by the NOAA Ship *Oscar Elton Sette*, per project:
+- Total gallons of diesel fuel consumed
+- Total nautical miles traveled
+- Days in range
+- Average fuel use per day
+- Average mileage per day
+- Day trip code, with *PDAS* identifying the periods of interest to this project
+These data were provided in a spreadsheet named `SE fuel report.xlsx`.
+
+Data provided by the NOAA Ship *Rainier*, per day:
+- Total nautical miles traveled
+- Total gallons of diesel fuel consumed
+These data were provided in a spreadsheet named `NMR & Fuel Tracker 2023.xlsx`.
+Relevant cruise dates were obtained from Jenni Samson (jennifer.samson@noaa.gov).  The *Rainier* data include fuel used for small boats, which averages about 30 gallons per day (see email from *Rainier* operations officer).
+
+### Data assumptions
+The following assumptions were made about our vehicles:  
+- Miles were assumed to be nautical miles unless stated otherwise.  
+
+### Data wrangling
+##### *Sette*
+Data for the *Sette* were loaded, filtered to PIFSC-only (`Day Type Code == PDAS`), and `Total Fuel (gals)` and `Total miles` were each summed.  These summed values were input into the EPA calculator tool.
+
+##### *Rainier*
+Data for the *Rainier* were loaded, filtered to the correct sea days, and fuel and miles were each summed.  These summed values were input into the EPA calculator tool
+
+## Preliminary results
+The preliminary estimate is that in FY23, PIFSC's use of NOAA ships emitted the equivalent of 2592.8 metric tons of CO~2~.
+
+## Final estimate
+The final estimate is that in FY23, PIFSC's use of NOAA ships emitted the equivalent of 2592.8 metric tons of CO~2~.
+
+## Error checking
+The data were also summed in a copy of the excel spreadsheets for comparison.  The values agreed with those calculated here.
+
+The data supplied by the NOAA Ship *Reuben Lasker* included an estimate of pounds of CO~2~ emitted per gallon of fuel (pounds CO~2~ = gallons diesel × 22).  There are approximately 2205 pounds in a metric ton.  From our calculator:
+248804 × 22 / 2205 = 2482.398 metric tons of CO~2~
+This is in the ballpart of the spreadsheet calculator.
+
+```{r}
+library(tidyverse)
+library(here)
+library(readxl)
+
+# SETTE
+# Load data
+# This will trigger a warning for the text summary at the end of numeric columns.
+# You can ignore it.
+Sette <- read_xlsx(here("Data", "SE fuel report.xlsx"), 
+                        col_types = c("text", "text", "text", "text", "text", 
+                                      "numeric", "numeric", "numeric", "numeric", "numeric"))
+
+# Filter to only PIFSC sea days:
+Sette_PIFSC <- filter(Sette, `Day Type Code` == 'PDAS')
+
+# Sum fuel and mileage
+Sette_PIFSC_fuel <- summarise(Sette_PIFSC, `Total Fuel (gals)` = sum(`Total Fuel (gals)`))
+Sette_PIFSC_miles <- summarise(Sette_PIFSC, `Total miles` = sum(`Total miles`))
+
+# Convert nautical miles to statute miles
+Sette_PIFSC_miles = Sette_PIFSC_miles * 1.15
+
+# RAINIER
+# Load data
+# The column with the name of the month reflects the day of the month
+# The column to the immediate right of the one with the name of the month reflects the value:
+# either miles run or fuel consumed
+# Also, the fuel data contain a mix of 0 and NA, with no fuel use in Nov or Dec
+Rainier_miles_sheet <- read_xlsx(here("Data", "NMR & Fuel Tracker 2023.xlsx"), 
+                                 sheet = "NMR", skip = 5)
+Rainier_fuel_sheet <- read_xlsx(here("Data", "NMR & Fuel Tracker 2023.xlsx"), 
+                                sheet = "FUEL", skip = 5)
+
+# Each sheet has an empty row under the column name - remove it
+# Now the row numbers match the days of the month
+Rainier_miles_sheet <- Rainier_miles_sheet[rowSums(is.na(Rainier_miles_sheet)) != 
+                                             ncol(Rainier_miles_sheet),]
+Rainier_fuel_sheet <- Rainier_fuel_sheet[rowSums(is.na(Rainier_fuel_sheet)) != 
+                                           ncol(Rainier_fuel_sheet),]
+
+# From Jenni's email, identify the correct days
+Rainier_miles <- sum(Rainier_miles_sheet$...6[9:23],   # Leg 2, March
+                     Rainier_miles_sheet$...6[29:31],  # Leg 3, March
+                     Rainier_miles_sheet$...8[1:21],   # Leg 3, April
+                     Rainier_miles_sheet$...8[25:30],  # Leg 4, April
+                     Rainier_miles_sheet$...10[1:13],  # Leg 4, May
+                     Rainier_miles_sheet$...12[19:30], # Leg 5/6, June
+                     Rainier_miles_sheet$...14[1:12],  # Leg 5/6, July
+                     Rainier_miles_sheet$...14[21:31], # Leg 7, July
+                     Rainier_miles_sheet$...16[1:10],  # Leg 7, August
+                     Rainier_miles_sheet$...18[4:5],   # Transit
+                     na.rm = TRUE) 
+
+Rainier_fuel <- sum(Rainier_fuel_sheet$...6[9:23],     # Leg 2, March 
+                    Rainier_fuel_sheet$...6[29:31],    # Leg 3, March
+                    Rainier_fuel_sheet$...8[1:21],     # Leg 3, April
+                    Rainier_fuel_sheet$...8[25:30],    # Leg 4, April
+                    Rainier_fuel_sheet$...10[1:13],    # Leg 4, May
+                    Rainier_fuel_sheet$...12[19:30],   # Leg 5/6, June
+                    Rainier_fuel_sheet$...14[1:12],    # Leg 5/6, July
+                    Rainier_fuel_sheet$...14[21:31],   # Leg 7, July
+                    Rainier_fuel_sheet$...16[1:10],    # Leg 7, August
+                    Rainier_fuel_sheet$...18[4:5],     # Transit
+                    na.rm = TRUE) 
+
+# Convert from nautical to statute miles
+Rainier_miles <- Rainier_miles * 1.15
+```

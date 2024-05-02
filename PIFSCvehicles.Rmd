@@ -1,0 +1,135 @@
+---
+title: "PIFSCvehicles"
+author: "Phoebe.Woodworth-Jefcoats@noaa.gov"
+date: "2024-01-30"
+output: html_document
+---
+
+# PIFSC vehicles - emissions inventory
+This document describes the methodology used to calculate the carbon footprint of PIFSC's vehicles. 
+Our vehicles are leased from GSA.
+
+### Data gathering
+Vehicle make, model, and mileage (odometer) data were provided by Stephanie Garnette (stephanie.m.garnett@noaa.gov), who got the data from GSA.  Data are available for the 12 months prior to the request, which was made in late January 2024.  Therefore, the full FY23 is not available.  Additionally, the values for January 2024 are likely to change.  Fuel use information was not available.
+Data available:  
+- Vehicle details are available in a [Google Sheet](https://docs.google.com/spreadsheets/d/1pCBJB6WRuL9Q3Xp1fAvQpZLzN_ZszWovN8rL_hT2gUI/edit#gid=0)
+- Vehicle mileage (odometer readings) was emailed as `FY 23 - FY 24.xlsx`.  It was renamed to `PIFSC_LeasedVehicle_Mileage_FY23FY24.xlsx` and also duplicated and paired with the information from the Google Sheet (`..._WithVehicleDetails.xlsx`).
+
+### Data assumptions
+The following assumptions were made about our vehicles:  
+- Without handy information to the contrary, I assumed that the vehicle year was that prior to the acquisition year.  This can likely be verified and/or corrected.
+- I assumed that a minivan is a passenger car, a Dodge 1500 is a light-duty truck, and both Dodge 3500 Rams and Ford F250s are heavy-duty vehicles.  This, too, can be corrected.
+- To calculate fuel use, I used the calculator's reference table for average fuel economy by vehicle type.  I assumed the minivan was a passenger vehicle and that all the trucks were 'other 2-axel, 4-tire vehicles'.
+
+### Data wrangling
+To get a preliminary estimate of FY23 emissions from PIFSC vehicles, the Feb 2023 odometer readings were subtracted from the October 2023 odometer readings.  These values were entered into the EPA-provided calculator, along with the assumptions above.
+
+A pared down version of the `..._WithVehicleDetails.xlsx` was converted to a .csv by deleting a few lines of text and headers, as well as unnecessary columns.  No information was edited or added.
+
+## Preliminary results
+The preliminary estimate is that in FY23 (Feb - Sep only), PIFSC's leased vehicles emitted the equivalent of 5.5 metric tons of CO~2~.  This does not account for missing months of data or spurious data.  
+
+## Spurious data
+There are some months with negative vehicle mileage, which results from typos in the spreadsheet (S. Garnett, pers. comm.).  I don't think this affects the Oct - Feb difference, but it does affect the calculation of monthly mileage which could be used to estimate the missing months.
+
+## Estimating missing data
+No odometer data were available for the first four months of FY23, which leaves us without mileage estimates for Oct 2022 through Jan 2023 (4 months).  There are a number of options for addressing this gap, including:  
+- Leaving the estimate as-is, without approximating missing data,
+- Using the average of the data that are available for each of the missing months,
+- Using the minimum or maximum mileage for a vehicle for each of the missing months to create a low or high estimate, 
+- Estimating missing data based on any trends in the available FY23 data,
+- Using FY24 data in place of FY23 data, and so on...
+
+Given the spurious data discussed above, I estimated average monthly mileage as the each vehicle's total mileage divided by 8 months.  I then multiplied that monthly average by 4 for the 4 missing months, added it to the total mileage, and entered those values into the calculator.  Alternatively, you could multiply the 8-month sum by 1.5.
+
+## Final estimate
+Once accounting for missing data, the final estimate is that in FY23 PIFSC's leased vehicles emitted the equivalent of 8.3 metric tons of CO~2~.
+
+
+## Error checking
+The EPA's (Greenhouse Gas Equivalencies Calculator)[https://www.epa.gov/energy/greenhouse-gases-equivalencies-calculator-calculations-and-references] uses the following estimate for emissions per mile:
+
+8.89 × 10^-^3 metric tons CO~2~/gallon gasoline × 1/22.9 miles per gallon car/truck average × 1 CO~2~, CH~4~, and N~2O/0.993 CO~2~ = 3.90 x 10^-^4 metric tons CO~2~E~/mile
+
+So, from our calculator, our conservative estimate would be 4.56 metric tons CO~2~e~ and our final estimate would be 6.83 metric tons CO~2~e~.  This is in the ballpark of the spreadsheet calculator.  It makes sense for our values to be higher because most of the vehicles are trucks.  
+
+```{r}
+library(tidyverse)
+library(here)
+
+MileageData <- read_csv(here("Data", "PIFSC_VehicleMileage_reqJan2024.csv"))
+# These data aren't 'tidy', but I'm going to live with it in the interests of expediency.
+# I may regret this decision, but here goes.
+
+y_lims <- c(min(MileageData[1:7,2:9]), max(MileageData[1:7,2:9]))
+
+# borrowing colors from https://personal.sron.nl/~pault/#tab:blindvision
+pal <- c('#CC6677', '#332288', '#DDCC77', '#117733', '#88CCEE', '#882255', '#44AA99') 
+
+pdf("PIFSCvehicles_odometer.pdf", width = 6, height = 4)
+for (v in seq(1,7,1)) {
+  plot(1:8, MileageData[v,2:9], type = "l", col = pal[v], 
+       xlim = c(-3, 15), ylim = y_lims, xaxt = "n", yaxt = "n", xlab = " ", ylab = " ",
+       bty = "l")
+  par(new = TRUE) 
+  plot(9:12, MileageData[v,10:13], type = "l", col = pal[v], 
+       xlim = c(-3, 15), ylim = y_lims, xaxt = "n", yaxt = "n", xlab = " ", ylab = " ",
+       bty = "l")
+  par(new = TRUE) 
+  # plot(-3:0, rep(min(as.numeric(MileageData[v,2:9])), 4), type = "l", lty = 2, col = pal[v], 
+  #      xlim = c(-3, 15), ylim = y_lims, xaxt = "n", yaxt = "n", xlab = " ", ylab = " ")
+  # par(new = TRUE)
+  text(14, MileageData[v,13], MileageData$Tag[v], col = pal[v])
+  par(new = TRUE)
+}
+axis((1), at = seq(-3,12,1), 
+     labels = c("Oct2022", "", "", "", 
+                "Feb2023", "", "", "", "Jun2023", "", "", "", 
+                "Oct2023", "", "", ""))
+axis((2), at = c(700, 1000, 5000, 10000, 13000), las = 1)
+dev.off()
+
+# Now calculate actual miles driven
+# MilesDriven <- array(NA, c(7,11))
+# for (m in seq(3,12,1)) {
+#   MilesDriven[1:7,(m - 2)] <- MileageData[1:7,m] - MileageData[1:7,(m - 1)]
+# }
+# This is tedious, but I keep getting errors when trying to loop through the columns
+MilesDriven <- MileageData$Tag
+Feb23 <- MileageData$`03/2023` - MileageData$`02/2023`
+Mar23 <- MileageData$`04/2023` - MileageData$`03/2023`
+Apr23 <- MileageData$`05/2023` - MileageData$`04/2023`
+May23 <- MileageData$`06/2023` - MileageData$`05/2023`
+Jun23 <- MileageData$`07/2023` - MileageData$`06/2023`
+Jul23 <- MileageData$`08/2023` - MileageData$`07/2023`
+Aug23 <- MileageData$`09/2023` - MileageData$`08/2023`
+Sep23 <- MileageData$`10/2023` - MileageData$`09/2023`
+
+MilesDriven <- bind_cols(MilesDriven, Feb23, Mar23, Apr23, May23, Jun23, Jul23, Aug23, Sep23)
+# Should rename these columns, but I am being lazy
+
+yy_lims <- c(min(MilesDriven[1:7,2:9]), max(MilesDriven[1:7,2:9]))
+
+pdf("PIFSCvehicles_MilesDrien.pdf", width = 6, height = 4)
+for (v in seq(1,7,1)) {
+  # Estimate monthly average
+  v_monthlymean <- (MileageData$`10/2023`[v] - MileageData$`02/2023`[v])/8
+  
+  plot(1:8, MilesDriven[v,2:9], type = "l", col = pal[v], 
+       xlim = c(-3, 15), ylim = yy_lims, xaxt = "n", yaxt = "n", xlab = " ", ylab = " ",
+       bty = "l")
+  par(new = TRUE) 
+  plot(-3:0, rep(v_monthlymean, 4), col = pal[v], 
+       xlim = c(-3, 15), ylim = yy_lims, xaxt = "n", yaxt = "n", xlab = " ", ylab = " ",
+       bty = "l")
+  par(new = TRUE)
+  text(10, MilesDriven[v,9], MileageData$Tag[v], col = pal[v])
+  par(new = TRUE)
+}
+axis((1), at = seq(-3,12,1), 
+     labels = c("Oct2022", "", "", "", 
+                "Feb2023", "", "", "", "Jun2023", "", "", "", 
+                "Oct2023", "", "", ""))
+axis((2), at = c(-700, -500, 0, 500, 1000), las = 1)
+dev.off()
+```

@@ -1,0 +1,357 @@
+---
+title: "PIFSCtravelFeds"
+author: "Phoebe.Woodworth-Jefcoats@noaa.gov"
+date: "2024-02-13"
+output: html_document
+---
+# PIFSC official travel (federal staff) - emissions inventory
+This document describes the methodology used to calculate the carbon footprint of PIFSC's official air
+travel by federal staff.
+
+### Data gathering
+Travel data were obtained from the Director's Office via access to the FY23 Projected Travel Google Sheet (not linked, as it has controlled access).  Unnecessary data were redacted from the downloaded spreadsheet prior to working with the data.
+The following data were retained:  
+- Traveler name (for determining travel origin; this is subsequently removed - see below)
+- Unique number of travelers per travel date(s) and destination (each row in the sheet is a unique traveler)
+- Travel Description
+- Justification
+- Destination
+- Travel dates
+
+Data were aggregated across all divisions into a single sheet titled `FY23_PIFSC_Fed_Travel_Redacted.xlsx`.  These data were pared down to only air travel 
+(`FY23_PIFSC_Fed_AirTravel_Redacted.xlsx`) by:
+- Removing any records that included the words 'local travel'
+- Removing ship-based travel (which is captured elsewhere in the inventory).  It is possible that by
+removing ship-based travel that didn't clearly include a leg of air travel, instances in which travelers are flown to or from the vessel may be missed.   
+- Removing records with a destination of 'Honolulu' or 'Main Hawaiian Islands' for IRC-based staff.
+
+Additionally, 
+- One duplicate travel event was deleted  
+- Travel events with 'unk' or 'tbd' destinations were removed
+- Travel events with no destination were removed
+- Travel events without specific travel start and travel end dates were removed 
+
+### Data assumptions
+The following assumptions were made about the travel data:  
+- Honolulu was assumed to be the travel origin city unless it was listed as the destination and not
+flagged as 'local travel' and the traveler was not based at IRC.  In these instances, city listed 
+for the traveler's NOAA Staff Directory was used. Travel to/from Honolulu for remote staff with Honolulu listed as their address in the NOAA Staff Directory was omitted due to lack of information on travel origin.
+- Struck-through entries were assumed not to have taken place.  All other travel entered was assumed
+to have be carried out and treated as described above.
+
+After applying the above filters and assumptions, 226 out of an initial 398 individual trips remained.
+
+These were further condensed by assuming:  
+- travelers traveling on the same dates to and from the same origin and destination were traveling on the same flights.  
+
+The final list of air travel trips included 331 unique travel events (outbound and inbound trips are listed separately).  These travel events were saved to the file `FlightLegs.csv`.
+
+The following location assumptions were made:
+- Both 'Guam and Saipan' and 'Guam, Saipan' were assumed to be 'Guam'
+- 'Big Island' was assumed to be the island of Hawaiʻi
+- 'Tutuila; Ofu; Ta'u' was assumed to be 'Tutuila'
+- 'Perth, Western Australia/Hobart, Tasmania' was assumed to be 'Perth, Western Australia'
+- 'Kei and Buru islands, Bali Straits' was assumed to be 'Kei islands, Indonesia'
+- 'Rose Atoll, American Samoa' was assumed to be 'Rose Atoll'
+- 'Honolulu, Kona' was assumed to be 'Honolulu'
+- various misspellings were assumed to be the corrected result returned by Google
+
+### Data wrangling
+To get a preliminary estimate of FY23 emissions from PIFSC air travel in FY23, considerable manual data wrangling was needed.  When attempting to load `FY23_PIFSC_Fed_AirTravel_Redacted.xlsx` into R over 50 records triggered date-related warning messages.  These were edited by hand to alter the date format while preserving the date information. Most commonly, this required editing 2-digit years (e.g., 23) to be 4-digit years (e.g., 2023), adding in missing years, adding leading zeros to single-digit months, changing the Excel cell classification from 'Text' to 'Short Date,' and rewriting text dates as numeric dates (e.g., April 30 to 04/30/2023).
+
+Traveler names were manually edited to be in the format of Last, First where they were written otherwise.  First names were edited to be written in their entirety where multiple versions were presented.  This was done in order to accurately replace travelers' identities with unique identifiers.  In some cases, a single traveler's name was entered different ways for different entries (e.g, Last, First as well as First Last; Doe, Jon as well as Doe, Jonathan).  This was save as `FY23_PIFSC_Fed_AirTravel_UniqueIDs.csv`.
+
+A list of all unique locations (origins and destinations) was generated (`UniqueFlightLocations.csv`; note that these are unique character strings, which include multiple representations of the same location).  To this list, latitudes and longitudes were added manually by searching for city (or island, state, or country, if that's all that was provided) locations on Google.  West longitudes were converted to 360-degree longitude by subtracting the value from 360.  For Honolulu, the Honolulu airport location was used.  
+
+Distances were measured using the same approach as used by the NOAA National Hurricane Center's [Latitude/Longitude Distance Calculator](https://www.nhc.noaa.gov/gccalc.shtml): Ed Williams's [Aviation Formulary V1.47](https://edwilliams.org/avform147.htm).
+
+Rather than copy and paste all 331 unique flight legs in the EPA's calculator tool, and manually selecting the flight length category for each (short, medium, or long haul), the following approach from the calculator was used in R, using the following emissions factors:
+* Air Short Haul (< 300 miles): 
+  * CO~2~ Factor = 0.207 kg per passenger-mile
+  * CH~4~ Factor = 0.0064 g per passenger-mile
+  * N~2~O Factor = 0.0066 g per passenger-mile
+* Air Medium Haul (>= 300 miles, < 2300 miles): 
+  * CO~2~ Factor = 0.129 kg per passenger-mile
+  * CH~4~ Factor = 0.0006 g per passenger-mile
+  * N~2~O Factor = 0.0041 g per passenger-mile
+* Air Long Haul (>= 2300 miles): 
+  * CO~2~ Factor = 0.163 kg per passenger-mile
+  * CH~4~ Factor = 0.0006 g per passenger-mile
+  * N~2~O Factor = 0.0052 g per passenger-mile
+  
+Emissions for each gas were determined by multiplying the appropriate factor by the distance traveled.  Emissions were summed for each gas, multiplied by the appropriate Global Warming Potential (GWP) factor:
+* CO~2~ GWP = 1
+* CH~4~ GWP = 25
+* N~2~O GWP = 298
+and converted to metric tons.
+
+## Preliminary results
+The preliminary estimate is that in FY23, PIFSC's official air travel emitted the equivalent of 187.0 metric tons of CO~2.  
+
+## Known limitations
+This approach assumes that all trips are a single point-to-point flight.  It is virtually certain that this underestimates the total emissions by underestimating the total number of flights and the total miles flown.
+
+In at least one instance, the dates in the travel spreadsheet failed to take into account personal leave appended to official travel.  This resulted in the assumption that multiple travelers were on a single flight, when in fact they travel separately.  If this is widespread across the travel spreadsheet, emissions are underestimated.
+
+All trips were assumed to be round trips.  In some cases, one direction was made via ship rather than air.  This results in an overestimate of flight-related emissions.  Based on comments in the spreadsheet, this likely to affects < 10% of all trips.
+
+The travel to/from Honolulu for remote staff whose NOAA Directory address is listed as Honolulu was not included.  This results in an underestimate of flight-related emissions.  It's estimated that this affects < 10% of all trips.
+
+## Error checking
+Ten random  travel legs were selected and their distance was computed using the NHC's lat/lon distance calculator for comparison to our methods to ensure the calculation was correctly coded.  For nine of the ten distances, there was zero difference between the two methods.  For one distance, the methods varied by 1 mile, which can reasonably be attributed to rounding differences. 
+
+
+The default version of the EPA's calculator tool has 32 rows for air travel.  To spot check
+the calculations used here, 32 random flight legs were selected.  The emissions for this subset was calculated using the above methodology and using the calculator tool.  This was repeated three times.  For the first iteration, the calculator tool estimated 19.2 metric tons CO~2~E~ and this methodology estimated 19.2 tons CO~2~E~.  For the second iteration, the calculator tool estimated 18.1 tons CO~2~E~ and this methodology estimated 18.1 tons CO~2~E~.  For the third iteration, the calculator tool estimated 16.0 tons CO~2~E~ and this methodology estimated 16.0 tons CO~2~E~.
+
+Additionally, each of the three error checks sampled 9.67% of the flights.  Scaling these estimates up results in 198.1 tons CO~2~E~, 187.3 tons CO~2~E~, and 165.3 tons CO~2~E~ respectively, which averages to 183.6 tons CO~2~E~ and is quite close to our calculated total of 187.0 tons CO~2~E~.
+
+## Final estimate
+Accepting the known limitations described above, the final estimate is that in FY23 PIFSC's official air travel emitted the equivalent of 187.0 metric tons of CO~2~.
+
+```{r, include = FALSE}
+library(tidyverse)
+library(readxl)
+library(here)
+library(lubridate)
+# library(sf)
+
+AirTravel <- read_excel(here('Data', 'AirTravel',
+                             'FY23_PIFSC_Fed_AirTravel_Redacted.xlsx'), 
+                        col_types = c('text', 'text', 'text', 'text', 'text', 
+                                      'date', 'date', 'text', 'text'))
+
+# Fill in 'Honolulu, HI'  where origin isn't specified
+HNL <- which(is.na(AirTravel$ORIGIN))
+AirTravel$ORIGIN[HNL] <- 'Honolulu, HI'
+
+# Add a Duration column - later
+
+# Identify unique Origin and Destination pairs
+indvOrigDest <- unique(AirTravel[,c('DESTINATION', 'ORIGIN')])
+
+# For each destination:
+# Find each unique origin
+# Fine unique travel start dates
+# Find unique travel end dates
+# Append to matrix that will have all unique travel events
+
+d_hold <- filter(AirTravel, 
+                 (DESTINATION == indvOrigDest$DESTINATION[1] & 
+                  ORIGIN == indvOrigDest$ORIGIN[1]))
+
+n_begin <- unique(d_hold$`TRAVEL START`)
+n_end <- unique(d_hold$`TRAVEL END`)
+
+OutboundBeginLocation <- rep(d_hold$ORIGIN[1], length(n_begin))
+OutboundEndLocation <- rep(d_hold$DESTINATION[1], length(n_begin))
+InboundBeginLocation <- rep(d_hold$DESTINATION[1], length(n_end))
+InboundEndLocation <- rep(d_hold$ORIGIN[1], length(n_end))
+
+Outbound <- bind_cols(OutboundBeginLocation, OutboundEndLocation)
+Inbound <- bind_cols(InboundBeginLocation, InboundEndLocation)
+
+FlightLegs <- bind_rows(Outbound, Inbound)
+
+for (d in seq(2, nrow(indvOrigDest), 1)) {
+  d_hold <- filter(AirTravel, 
+                   (DESTINATION == indvOrigDest$DESTINATION[d] & 
+                    ORIGIN == indvOrigDest$ORIGIN[d]))
+  
+  n_begin <- unique(d_hold$`TRAVEL START`)
+  n_end <- unique(d_hold$`TRAVEL END`)
+  
+  OutboundBeginLocation <- rep(d_hold$ORIGIN[1], length(n_begin))
+  OutboundEndLocation <- rep(d_hold$DESTINATION[1], length(n_begin))
+  InboundBeginLocation <- rep(d_hold$DESTINATION[1], length(n_end))
+  InboundEndLocation <- rep(d_hold$ORIGIN[1], length(n_end))
+  
+  Outbound <- bind_cols(OutboundBeginLocation, OutboundEndLocation)
+  Inbound <- bind_cols(InboundBeginLocation, InboundEndLocation)
+  
+  FlightLegs <- bind_rows(FlightLegs, Outbound, Inbound)
+}
+
+FlightLegs <- rename(FlightLegs, BeginLocation = ...1)
+FlightLegs <- rename(FlightLegs, EndLocation = ...2)
+
+# write_csv(FlightLegs, here("Data", 'FY23_PIFSC_FlightLegs.csv'))
+
+# Identify all unique cities
+AllCities <- bind_rows(FlightLegs[,1], FlightLegs[,2])
+AllFlightCities <- unique(AllCities[,1])
+AllFlightCities <- rename(AllFlightCities, City = BeginLocation)
+# write_csv(AllFlightCities, here("Data", 'UniqueFlightLocations.csv'))
+
+# Load city locations
+FlightCities <- read_csv(here("Data", "UniqueFlightLocations.csv"))
+
+# For each flight leg:
+# Add BeginLocation lat/lon -> Blat/Blon
+# Add EndLocation lat/lon -> Elat/Elon
+Blat <- matrix(NA, nrow = nrow(FlightLegs), ncol = 1)
+Blon <- matrix(NA, nrow = nrow(FlightLegs), ncol = 1)
+Elat <- matrix(NA, nrow = nrow(FlightLegs), ncol = 1)
+Elon <- matrix(NA, nrow = nrow(FlightLegs), ncol = 1)
+for (c in seq(1, nrow(FlightLegs), 1)) {
+  Bidx <- which(FlightCities$City == FlightLegs$BeginLocation[c])
+  Eidx <- which(FlightCities$City == FlightLegs$EndLocation[c])
+  
+  Blat[c,1] <- FlightCities$Lat[Bidx]
+  Blon[c,1] <- FlightCities$Lon[Bidx]
+  Elat[c,1] <- FlightCities$Lat[Eidx]
+  Elon[c,1] <- FlightCities$Lon[Eidx]
+}
+
+FlightLegs <- bind_cols(FlightLegs, Blat, Blon, Elat, Elon)
+FlightLegs <- rename(FlightLegs, BeginLat = ...3)
+FlightLegs <- rename(FlightLegs, BeginLon = ...4)
+FlightLegs <- rename(FlightLegs, EndLat = ...5)
+FlightLegs <- rename(FlightLegs, EndLon = ...6)
+
+# # Calculate distances, converting meters to kilometers to miles
+# ptA <- st_sfc(st_point(c(FlightLegs$BeginLon[1], FlightLegs$BeginLat[1]))) |>
+#   st_set_crs(4326)
+# ptB <- st_sfc(st_point(c(FlightLegs$EndLon[1], FlightLegs$EndLon[1]))) |>
+#   st_set_crs(4326)
+# 
+# FlightDistance <- st_distance(ptA, ptB)/1000 * 0.6214 
+
+# Alternative method, because the distances from the above don't match other calculators
+# This approach (https://edwilliams.org/avform147.htm, linked from NOAA's NHC) uses
+# N and W as positive and S and E as negative, so (sigh):
+Blon_conv <- Blon
+Elon_conv <- Elon
+for (r in seq(1, length(Blon), 1)) {
+  if (Blon_conv[r,1] < 180) {
+    Blon_conv[r,1] = Blon[r,1] * -1
+  } else if (Blon_conv[r,1] > 180) {
+    Blon_conv[r,1] = 360 - Blon[r,1]
+  }
+  
+  if (Elon_conv[r,1] < 180) {
+    Elon_conv[r,1] = Elon[r,1] * -1
+  } else if (Elon_conv[r,1] > 180) {
+    Elon_conv[r,1] = 360 - Elon[r,1]
+  }
+}
+
+# It also uses radians rather than degrees
+# And nm rather than statue miles
+deg2rad <- function(deg) {
+  return((pi/180) * deg)
+}
+
+FlightDistance <- matrix(NA, nrow = length(Blat))
+for (r in seq(1, length(FlightDistance), 1)) {
+  FlightDistance[r] <- acos(sin(deg2rad(Blat[r])) * 
+                            sin(deg2rad(Elat[r])) + 
+                            cos(deg2rad(Blat[r])) * 
+                            cos(deg2rad(Elat[r])) * 
+                            cos(deg2rad(Blon_conv[r]) - deg2rad(Elon_conv[r]))) * 
+                        ((180*60)/pi) * 1.15078 
+}
+
+FlightLegs <- bind_cols(FlightLegs, FlightDistance)
+FlightLegs <- rename(FlightLegs, FlightDistance = ...7)
+
+# write_csv(FlightLegs, here("Data", "FY23_PIFSC_UniqueFlightLegs.csv"))
+
+# Calculate emissions
+CO2emissions <- matrix(NA, nrow = (length(Blat)))
+CH4emissions <- matrix(NA, nrow = (length(Blat)))
+N2Oemissions <- matrix(NA, nrow = (length(Blat)))
+
+ShortHaul <- which(FlightLegs$FlightDistance < 300)
+MedHaul <- which(FlightLegs$FlightDistance >= 300 & FlightLegs$FlightDistance < 2300)
+LongHaul <- which(FlightLegs$FlightDistance >= 2300)
+
+CO2emissions[ShortHaul] = FlightLegs$FlightDistance[ShortHaul] * 0.207
+CO2emissions[MedHaul] = FlightLegs$FlightDistance[MedHaul] * 0.129
+CO2emissions[LongHaul] = FlightLegs$FlightDistance[LongHaul] * 0.163
+
+CH4emissions[ShortHaul] = FlightLegs$FlightDistance[ShortHaul] * 0.0064
+CH4emissions[MedHaul] = FlightLegs$FlightDistance[MedHaul] * 0.0006
+CH4emissions[LongHaul] = FlightLegs$FlightDistance[LongHaul] * 0.0006
+
+N2Oemissions[ShortHaul] = FlightLegs$FlightDistance[ShortHaul] * 0.0066
+N2Oemissions[MedHaul] = FlightLegs$FlightDistance[MedHaul] * 0.0041
+N2Oemissions[LongHaul] = FlightLegs$FlightDistance[LongHaul] * 0.0052
+
+FlightEmissions <- (sum(CO2emissions) + 
+                    sum(CH4emissions) * 25 / 1000 + 
+                    sum(N2Oemissions) * 298 / 1000) / 1000
+
+# Error check - commented out to preserve results
+# L10 <- sample.int(length(Blat), 10, replace = FALSE)
+# # Saving this so it can be replicated
+# DistanceCheck <- bind_cols(FlightLegs$BeginLat[L10], 
+#                            FlightLegs$BeginLon[L10], 
+#                            FlightLegs$EndLat[L10],
+#                            FlightLegs$EndLon[L10], 
+#                            FlightLegs$FlightDistance[L10])
+# DistanceCheck <- rename(DistanceCheck, BeginLat = ...1)
+# DistanceCheck <- rename(DistanceCheck, BeginLon = ...2)
+# DistanceCheck <- rename(DistanceCheck, EndLat = ...3)
+# DistanceCheck <- rename(DistanceCheck, EndLon = ...4)
+# DistanceCheck <- rename(DistanceCheck, FlightDistance = ...5)
+# write_csv(DistanceCheck, here("Data", "PIFSC_FlightEmissions_DistanceCheck.csv"))
+
+# EC1 <- sample.int(length(Blat), 32, replace = FALSE)
+# EC2 <- sample.int(length(Blat), 32, replace = FALSE)
+# EC3 <- sample.int(length(Blat), 32, replace = FALSE)
+# Saving these so that this can be replicated
+# EC1 <- as.matrix(EC1)
+# EC2 <- as.matrix(EC2)
+# EC3 <- as.matrix(EC3)
+# ErrorChecks <- bind_cols(EC1, EC2, EC3)
+# write_csv(ErrorChecks, here("Data", "PIFSC_FlightEmissions_ErrorChecks.csv"))
+
+# Test1 <- FlightLegs$FlightDistance[EC1]
+# Test2 <- FlightLegs$FlightDistance[EC2]
+# Test3 <- FlightLegs$FlightDistance[EC3]
+# 
+# 
+# Sub1 <- (sum(CO2emissions[EC1]) + 
+#          sum(CH4emissions[EC1]) * 25 / 1000 + 
+#          sum(N2Oemissions[EC1]) * 298 / 1000) / 1000
+# 
+# Sub2 <- (sum(CO2emissions[EC2]) + 
+#          sum(CH4emissions[EC2]) * 25 / 1000 + 
+#          sum(N2Oemissions[EC2]) * 298 / 1000) / 1000
+# 
+# Sub3 <- (sum(CO2emissions[EC3]) + 
+#          sum(CH4emissions[EC3]) * 25 / 1000 + 
+#          sum(N2Oemissions[EC3]) * 298 / 1000) / 1000
+
+# Finally, save a version where names are replaced by unique numeric identifiers
+n_travelers <- unique(AirTravel$`TRAVELER NAME (LAST, FIRST)`)
+uq_id <- sample.int(length(n_travelers), length(n_travelers), replace = FALSE)
+
+TravelerID <- matrix(NA, nrow = nrow(AirTravel))
+for (r in seq(1, length(TravelerID), 1)) {
+  idx <- which(n_travelers == AirTravel$`TRAVELER NAME (LAST, FIRST)`[r])
+  TravelerID[r,1] <- uq_id[idx]
+}
+
+# Add this to the matrix, remove the Traveler Name column, and save
+AirTravel_Unique_Redacted <- bind_cols(TravelerID,
+                                       AirTravel$`CONFERENCE/MEETING NAME, TRAVEL DESCRIPTION`,
+                                       AirTravel$JUSTIFICATION,
+                                       AirTravel$DESTINATION,
+                                       AirTravel$`TRAVEL START`,
+                                       AirTravel$`TRAVEL END`,
+                                       AirTravel$NOTES,
+                                       AirTravel$ORIGIN)
+AirTravel_Unique_Redacted <- rename(AirTravel_Unique_Redacted, TravelerID = ...1)
+AirTravel_Unique_Redacted <- rename(AirTravel_Unique_Redacted, Description = ...2)
+AirTravel_Unique_Redacted <- rename(AirTravel_Unique_Redacted, Justification = ...3)
+AirTravel_Unique_Redacted <- rename(AirTravel_Unique_Redacted, Destination = ...4)
+AirTravel_Unique_Redacted <- rename(AirTravel_Unique_Redacted, TravelStart = ...5)
+AirTravel_Unique_Redacted <- rename(AirTravel_Unique_Redacted, TravelEnd = ...6)
+AirTravel_Unique_Redacted <- rename(AirTravel_Unique_Redacted, Notes = ...7)
+AirTravel_Unique_Redacted <- rename(AirTravel_Unique_Redacted, Origin = ...8)
+# write_csv(AirTravel_Unique_Redacted, here("Data", "FY23_PIFSC_Fed_AirTravel_UniqueIDs.csv"))
+
+
+```

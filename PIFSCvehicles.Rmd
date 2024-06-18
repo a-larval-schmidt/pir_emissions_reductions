@@ -49,7 +49,7 @@ Once accounting for missing data, the final estimate is that in FY23 PIFSC's lea
 ## Error checking
 The EPA's (Greenhouse Gas Equivalencies Calculator)[https://www.epa.gov/energy/greenhouse-gases-equivalencies-calculator-calculations-and-references] uses the following estimate for emissions per mile:
 
-8.89 × 10^-^3 metric tons CO~2~/gallon gasoline × 1/22.9 miles per gallon car/truck average × 1 CO~2~, CH~4~, and N~2O/0.993 CO~2~ = 3.90 x 10^-^4 metric tons CO~2~E~/mile
+8.89 × 10^-^3 metric tons CO~2~/gallon gasoline × 1/22.9 miles per gallon car/truck average × 1 CO~2~, CH~4~, and N~2O/0.993 CO~2~ = 3.91 x 10^-^4 metric tons CO~2~E~/mile
 
 So, from our calculator, our conservative estimate would be 4.56 metric tons CO~2~e~ and our final estimate would be 6.83 metric tons CO~2~e~.  This is in the ballpark of the spreadsheet calculator.  It makes sense for our values to be higher because most of the vehicles are trucks.  
 

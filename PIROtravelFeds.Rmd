@@ -1,0 +1,372 @@
+---
+title: "PIROtravelFeds"
+author: "Phoebe.Woodworth-Jefcoats@noaa.gov"
+date: "2024-06-07"
+output: html_document
+---
+
+# PIRO official travel (federal staff) - emissions inventory
+This document describes the methodology used to calculate the carbon footprint of PIRO's official air
+travel by federal staff.
+
+### Data gathering
+Travel data were obtained from Lynda Funk (lynda.funk@noaa.gov) and included the following:  
+
+* Travel start date  
+* Travel end date  
+* Departure location  
+* Destination(s)  
+
+Travelers' identifying information was removed prior to sharing the data.  Data were shared via Google Sheet,
+and downloaded to `PIRO Greenhouse Emissions Travel and Vehicles .xls`.  The sheet `Trips in FY23` was used for
+this analysis.  
+
+```{r, include = FALSE}
+# Set environment
+library(tidyverse)
+library(readxl)
+library(here)
+library(lubridate)
+library(tidyxl)
+```
+
+```{r, include = FALSE}
+# Load data
+formats_PIRO <- xlsx_formats(here('Data', 'PIRO Greenhouse Emissions Travel and Vehicles .xlsx'))
+cells_PIRO <- xlsx_cells(here('Data', 'PIRO Greenhouse Emissions Travel and Vehicles .xlsx'))
+# Note: this took some manual sleuthing
+shade_PIRO <- which(formats_PIRO$local$fill$patternFill$bgColor$rgb == "FFE2EFD9")
+cells_PIRO_shade <- cells_PIRO[cells_PIRO$local_format_id %in% shade_PIRO, 2]
+cells_PIRO_shade <- parse_number(cells_PIRO_shade$address)
+PIRO_rows_shade <- unique(cells_PIRO_shade)
+
+AllPIROtravel <- read_excel(here('Data', 'PIRO Greenhouse Emissions Travel and Vehicles .xlsx'),
+                         sheet = 'Trips in FY23',
+                         col_types = c('date', 'date', 'text', 'text', 'text'))
+
+# Remove struck-through row, subtracting 1 to account for the header
+Travel_PIRO_noShade <- AllPIROtravel[-(PIRO_rows_shade - 1),]
+
+# Remove records with out dates
+# NoDate_start <- which(is.na(Travel_PIRO_noShade$`Start Date`)) # empty
+NoDate_end <- which(is.na(Travel_PIRO_noShade$`End Date`))
+Travel_PIRO_withLocal <- Travel_PIRO_noShade[-NoDate_end,]
+                
+# Remove records to and from Honolulu
+DptLocal_idx1 <- str_detect(Travel_PIRO_withLocal$`Departing From`, fixed('Hon', ignore_case = TRUE))
+DestHON_idx <- str_detect(Travel_PIRO_withLocal$`Destination(s)`, fixed('Hon', ignore_case = TRUE))
+DptLocal1 <- which(DptLocal_idx1 == TRUE)
+DestHON <- which(DestHON_idx == TRUE)
+LocalTravel1 <- intersect(DptLocal1, DestHON)
+AllTravel_rmvLocal1 <- Travel_PIRO_withLocal[-LocalTravel1,]
+
+DptLocal_idx2 <- str_detect(AllTravel_rmvLocal1$`Departing From`, fixed('Hon', ignore_case = TRUE))
+DestHNL_idx <- str_detect(AllTravel_rmvLocal1$`Destination(s)`, fixed('HNL', ignore_case = TRUE))
+DptLocal2 <- which(DptLocal_idx2 == TRUE)
+DestHNL <- which(DestHNL_idx == TRUE)
+LocalTravel2 <- intersect(DptLocal2, DestHNL)
+AllTravel_noLocal <- AllTravel_rmvLocal1[-LocalTravel2,]
+
+# Remove ambiguous records (these were identified when adding city lat/lons)
+ambig1 <- ambig1 <- which(AllTravel_noLocal$`Destination(s)` == 'Miami or DC')
+AllTravel_ambig1 <- AllTravel_noLocal[-ambig1,]
+
+ambig2 <- which(AllTravel_ambig1$`Destination(s)` == 'Panama city')
+AllTravel_ambig2 <- AllTravel_ambig1[-ambig2,]
+
+ambig3 <- which(AllTravel_ambig2$`Destination(s)` == 'Washington')
+AirTravel <- AllTravel_ambig2[-ambig3,]
+```
+
+### Data wrangling and assumptions
+The following assumptions were made about the data:  
+
+* Each row in the sheet was assumed to be a unique travel event.  Further, it was assumed that each row was a 
+direct flight between the departure and destination locations.  This assumption was made due to lack of information 
+to the contrary.  
+* Records with impossible dates (e.g., 5/51/23) were excluded (_n_ = `r length(NoDate_end)`)  
+* Hidden and shaded rows were assumed to be trips not taken and were omitted (_n_ = `r length(PIRO_rows_shade)`)
+* Travel departing from Honolulu with a destination of Honolulu was assumed to be local travel (i.e., not air travel) 
+and omitted (_n_ = `r length(LocalTravel1) + length(LocalTravel2)`)  
+
+* When multiple destinations were listed, the first destination was used due to lack of information about possible
+travel between locations.  Specifically:  
+    * 'DC/FL' and 'DC/Silver Spring' were assumed to be Washington, DC  
+    * 'Guam/Saipan' was assumed to be Guam  
+    * 'Manta, Ecuador/DC' was assumed to be Manda, Ecuador
+    * 'Palau, Micronesia, Guam' was assumed to be 'Palau'
+* Records with ambiguous locations were removed:  
+    * 'Miami or DC' (_n_ = `r length(ambig1)`)
+    * 'Panama City' (_n_ = `r length(ambig2)`)
+    * 'Washington' (_n_ = `r length(ambig3)`)
+* The location of Hawaiʻi Volcanoes National Park was used in place of 'Kilauea Military Camp, HI' because a Google search for the latter's
+geographic coordinates yielded no results and the most relevant result pointed to the Park.
+* 'AS' was assumed to be 'American Samoa'  
+* All trips were assumed to be round trips given a lack of information to the contrary
+
+One entry was manually reformatted to the appropriate style (i.e., mm/dd/yyyy).  One impossible date (see above) was manually deleted 
+so the file could load and the entry subsequently omitted from the analysis.
+
+All other travel entered was assumed to have be carried out and treated as described above.
+
+After applying the above filters and assumptions, `r dim(AirTravel)[1]` out of an initial `r dim(AllPIROtravel)[1]` individual trips remained.  Note that this would translate to `r (dim(AirTravel)[1]) * 2` unique travel events because each trip is treated as round-trip.
+
+These were further condensed by assuming:  
+
+* travelers traveling on the same dates to and from the same origin and destination were traveling on the same flights.  
+A list of all unique locations (origins and destinations) was generated (`UniqueFlightLocations.csv`; note that these are unique character strings, which include multiple representations of the same location).  To this list, latitudes and longitudes were added manually by searching for city (or island, state, or country, if that's all that was provided) locations on Google.  West longitudes were converted to 360-degree longitude by subtracting the value from 360.  For Honolulu, the Honolulu airport location was used.  
+
+```{r, include = FALSE}
+# First, let's clean up a bit and keep just the tibble we need
+rm(list = setdiff(ls(), "AirTravel"))
+
+# And rename things to that they match the code we used for PIFSC air travel
+AirTravel <- rename(AirTravel, TravelStart = `Start Date`)
+AirTravel <- rename(AirTravel, TravelEnd = `End Date`)
+AirTravel <- rename(AirTravel, Origin = `Departing From`)
+AirTravel <- rename(AirTravel, Destination = `Destination(s)`)
+```
+
+```{r, include = FALSE}
+# Identify unique Origin and Destination pairs
+indvOrigDest <- unique(AirTravel[,c('Destination', 'Origin')])
+
+# For each destination:
+# Find each unique origin
+# Fine unique travel start dates
+# Find unique travel end dates
+# Append to matrix that will have all unique travel events
+
+d_hold <- filter(AirTravel, 
+                (Destination == indvOrigDest$Destination[1] & 
+                 Origin == indvOrigDest$Origin[1]))
+
+n_begin <- unique(d_hold$`TravelStart`)
+n_end <- unique(d_hold$`TravelEnd`)
+ 
+OutboundBeginLocation <- rep(d_hold$Origin[1], length(n_begin))
+OutboundEndLocation <- rep(d_hold$Destination[1], length(n_begin))
+InboundBeginLocation <- rep(d_hold$Destination[1], length(n_end))
+InboundEndLocation <- rep(d_hold$Origin[1], length(n_end))
+ 
+Outbound <- bind_cols(OutboundBeginLocation, OutboundEndLocation)
+Inbound <- bind_cols(InboundBeginLocation, InboundEndLocation)
+ 
+FlightLegs <- bind_rows(Outbound, Inbound)
+
+for (d in seq(2, nrow(indvOrigDest), 1)) {
+ d_hold <- filter(AirTravel, 
+                  (Destination == indvOrigDest$Destination[d] & 
+                   Origin == indvOrigDest$Origin[d]))
+ 
+ n_begin <- unique(d_hold$`TravelStart`)
+ n_end <- unique(d_hold$`TravelEnd`)
+ 
+ OutboundBeginLocation <- rep(d_hold$Origin[1], length(n_begin))
+ OutboundEndLocation <- rep(d_hold$Destination[1], length(n_begin))
+ InboundBeginLocation <- rep(d_hold$Destination[1], length(n_end))
+ InboundEndLocation <- rep(d_hold$Origin[1], length(n_end))
+ 
+ Outbound <- bind_cols(OutboundBeginLocation, OutboundEndLocation)
+ Inbound <- bind_cols(InboundBeginLocation, InboundEndLocation)
+ 
+ FlightLegs <- bind_rows(FlightLegs, Outbound, Inbound)
+}
+ 
+FlightLegs <- rename(FlightLegs, BeginLocation = ...1)
+FlightLegs <- rename(FlightLegs, EndLocation = ...2)
+
+write_csv(FlightLegs, here('Data', 'FY23_PIRO_FlightLegs.csv'))
+ 
+# Identify all unique cities
+# It's a little cumbersome, but we're going to add new ones manually 
+# And the comment this out
+# AllCities <- bind_rows(FlightLegs[,1], FlightLegs[,2])
+# AllFlightCities <- unique(AllCities[,1])
+# AllFlightCities <- rename(AllFlightCities, City = BeginLocation)
+# FlightCities_PIFSC <- read_csv(here('Data', 'AirTravel', "UniqueFlightLocations.csv"))
+# NewFlightCities <- setdiff(AllFlightCities$City, FlightCities_PIFSC$City)
+
+# Load city locations
+FlightCities <- read_csv(here('Data', 'AirTravel', "UniqueFlightLocations.csv"))
+
+# For each flight leg:
+# Add BeginLocation lat/lon -> Blat/Blon
+# Add EndLocation lat/lon -> Elat/Elon
+Blat <- matrix(NA, nrow = nrow(FlightLegs), ncol = 1)
+Blon <- matrix(NA, nrow = nrow(FlightLegs), ncol = 1)
+Elat <- matrix(NA, nrow = nrow(FlightLegs), ncol = 1)
+Elon <- matrix(NA, nrow = nrow(FlightLegs), ncol = 1)
+for (c in seq(1, nrow(FlightLegs), 1)) {
+  Bidx <- which(FlightCities$City == FlightLegs$BeginLocation[c])
+  Eidx <- which(FlightCities$City == FlightLegs$EndLocation[c])
+
+  Blat[c,1] <- FlightCities$Lat[Bidx]
+  Blon[c,1] <- FlightCities$Lon[Bidx]
+  Elat[c,1] <- FlightCities$Lat[Eidx]
+  Elon[c,1] <- FlightCities$Lon[Eidx]
+}
+
+FlightLegs <- bind_cols(FlightLegs, Blat, Blon, Elat, Elon)
+FlightLegs <- rename(FlightLegs, BeginLat = ...3)
+FlightLegs <- rename(FlightLegs, BeginLon = ...4)
+FlightLegs <- rename(FlightLegs, EndLat = ...5)
+FlightLegs <- rename(FlightLegs, EndLon = ...6)
+
+# This approach (https://edwilliams.org/avform147.htm, linked from NOAA's NHC) uses
+# N and W as positive and S and E as negative, so (sigh):
+Blon_conv <- Blon
+Elon_conv <- Elon
+for (r in seq(1, length(Blon), 1)) {
+  if (Blon_conv[r,1] < 180) {
+    Blon_conv[r,1] = Blon[r,1] * -1
+  } else if (Blon_conv[r,1] > 180) {
+    Blon_conv[r,1] = 360 - Blon[r,1]
+  }
+
+  if (Elon_conv[r,1] < 180) {
+    Elon_conv[r,1] = Elon[r,1] * -1
+  } else if (Elon_conv[r,1] > 180) {
+    Elon_conv[r,1] = 360 - Elon[r,1]
+  }
+}
+
+# It also uses radians rather than degrees
+# And nm rather than statue miles
+deg2rad <- function(deg) {
+  return((pi/180) * deg)
+}
+
+FlightDistance <- matrix(NA, nrow = length(Blat))
+for (r in seq(1, length(FlightDistance), 1)) {
+  FlightDistance[r] <- acos(sin(deg2rad(Blat[r])) *
+                            sin(deg2rad(Elat[r])) +
+                            cos(deg2rad(Blat[r])) *
+                            cos(deg2rad(Elat[r])) *
+                            cos(deg2rad(Blon_conv[r]) - deg2rad(Elon_conv[r]))) *
+                        ((180*60)/pi) * 1.15078
+}
+
+FlightLegs <- bind_cols(FlightLegs, FlightDistance)
+FlightLegs <- rename(FlightLegs, FlightDistance = ...7)
+
+write_csv(FlightLegs, here('Data', "FY23_PIRO_UniqueFlightLegs.csv"))
+```
+
+The final list of air travel trips included `r dim(FlightLegs)[1]` unique travel events (outbound and inbound trips are listed separately).  These travel events were saved to the file `FY23_PIRO_UniqueFlightLegs.csv`.
+
+### Analysis
+Distances were measured using the same approach as used by the NOAA National Hurricane Center's [Latitude/Longitude Distance Calculator](https://www.nhc.noaa.gov/gccalc.shtml): Ed Williams's [Aviation Formulary V1.47](https://edwilliams.org/avform147.htm).
+
+Rather than copy and paste all `r dim(FlightLegs)[1]` unique flight legs in the EPA's calculator tool, and manually selecting the flight length category for each (short, medium, or long haul), the following approach from the calculator was used in R, using the following emissions factors:  
+
+* Air Short Haul (< 300 miles):  
+     * CO~2~ Factor = 0.207 kg per passenger-mile  
+     * CH~4~ Factor = 0.0064 g per passenger-mile  
+     * N~2~O Factor = 0.0066 g per passenger-mile  
+* Air Medium Haul (>= 300 miles, < 2300 miles):   
+     * CO~2~ Factor = 0.129 kg per passenger-mile  
+     * CH~4~ Factor = 0.0006 g per passenger-mile  
+     * N~2~O Factor = 0.0041 g per passenger-mile  
+* Air Long Haul (>= 2300 miles):   
+     * CO~2~ Factor = 0.163 kg per passenger-mile  
+     * CH~4~ Factor = 0.0006 g per passenger-mile  
+     * N~2~O Factor = 0.0052 g per passenger-mile  
+
+Emissions for each gas were determined by multiplying the appropriate factor by the distance traveled.  Emissions were summed for each gas, multiplied by the appropriate Global Warming Potential (GWP) factor:  
+
+* CO~2~ GWP = 1  
+* CH~4~ GWP = 25  
+* N~2~O GWP = 298  
+
+and converted to metric tons.
+
+```{r, include = FALSE}
+# Clean up again and use only what we need
+rm(list = ls())
+
+FlightLegs <- read_csv(here('Data', "FY23_PIRO_UniqueFlightLegs.csv"))
+
+# Calculate emissions
+CO2emissions <- matrix(NA, nrow = dim(FlightLegs)[1])
+CH4emissions <- matrix(NA, nrow = dim(FlightLegs)[1])
+N2Oemissions <- matrix(NA, nrow = dim(FlightLegs)[1])
+
+ShortHaul <- which(FlightLegs$FlightDistance < 300)
+MedHaul <- which(FlightLegs$FlightDistance >= 300 & FlightLegs$FlightDistance < 2300)
+LongHaul <- which(FlightLegs$FlightDistance >= 2300)
+
+CO2emissions[ShortHaul] = FlightLegs$FlightDistance[ShortHaul] * 0.207
+CO2emissions[MedHaul] = FlightLegs$FlightDistance[MedHaul] * 0.129
+CO2emissions[LongHaul] = FlightLegs$FlightDistance[LongHaul] * 0.163
+
+CH4emissions[ShortHaul] = FlightLegs$FlightDistance[ShortHaul] * 0.0064
+CH4emissions[MedHaul] = FlightLegs$FlightDistance[MedHaul] * 0.0006
+CH4emissions[LongHaul] = FlightLegs$FlightDistance[LongHaul] * 0.0006
+
+N2Oemissions[ShortHaul] = FlightLegs$FlightDistance[ShortHaul] * 0.0066
+N2Oemissions[MedHaul] = FlightLegs$FlightDistance[MedHaul] * 0.0041
+N2Oemissions[LongHaul] = FlightLegs$FlightDistance[LongHaul] * 0.0052
+
+FlightEmissions <- (sum(CO2emissions) +
+                    sum(CH4emissions) * 25 / 1000 +
+                    sum(N2Oemissions) * 298 / 1000) / 1000
+```
+
+## Preliminary results
+The preliminary estimate is that in FY23, PIRO's official air travel emitted the equivalent of __`r signif(FlightEmissions,4)` metric tons of CO~2~__.  
+
+## Known limitations
+This approach assumes that all trips are a single point-to-point flight.  It is virtually certain that this underestimates the total emissions by underestimating the total number of flights and the total miles flown.
+
+All trips were assumed to be round trips.  Additionally, this methodology likely omits additional legs for trips with multiple destinations.
+
+```{r, include = FALSE}
+# # Error check - commented out to preserve results
+# EC1 <- sample.int(dim(FlightLegs)[1], 32, replace = FALSE)
+# EC2 <- sample.int(dim(FlightLegs)[1], 32, replace = FALSE)
+# EC3 <- sample.int(dim(FlightLegs)[1], 32, replace = FALSE)
+# # Saving these so that this can be replicated
+# EC1 <- as.matrix(EC1)
+# EC2 <- as.matrix(EC2)
+# EC3 <- as.matrix(EC3)
+# ErrorChecks <- bind_cols(EC1, EC2, EC3)
+# write_csv(ErrorChecks, here('Data', "PIRO_FlightEmissions_ErrorChecks.csv"))
+# 
+# Test1 <- FlightLegs$FlightDistance[EC1]
+# Test2 <- FlightLegs$FlightDistance[EC2]
+# Test3 <- FlightLegs$FlightDistance[EC3]
+# 
+# 
+# Sub1 <- (sum(CO2emissions[EC1]) +
+#          sum(CH4emissions[EC1]) * 25 / 1000 +
+#          sum(N2Oemissions[EC1]) * 298 / 1000) / 1000
+# 
+# Sub2 <- (sum(CO2emissions[EC2]) +
+#          sum(CH4emissions[EC2]) * 25 / 1000 +
+#          sum(N2Oemissions[EC2]) * 298 / 1000) / 1000
+# 
+# Sub3 <- (sum(CO2emissions[EC3]) +
+#          sum(CH4emissions[EC3]) * 25 / 1000 +
+#          sum(N2Oemissions[EC3]) * 298 / 1000) / 1000
+```
+
+## Error checking
+The default version of the EPA's calculator tool has 32 rows for air travel.  To spot check
+the calculations used here, 32 random flight legs were selected.  The emissions for this subset was calculated using the above methodology and using the calculator tool.  This was repeated three times.  For the first iteration, the calculator tool estimated 15.4 metric tons CO~2~e and this methodology estimated 15.4 tons CO~2~e.  For the second iteration, the calculator tool estimated 13.4 tons CO~2~e and this methodology estimated 13.4 tons CO~2~e.  For the third iteration, the calculator tool estimated 15.5 tons CO~2~e and this methodology estimated 15.4 tons CO~2~e.
+
+```{r, include = FALSE}
+# Scaling up the error checkestimates to the full number of flight legs
+pct_samp <- 32/dim(FlightLegs)[1]*100
+
+sup1 <- 15.4 / (32/dim(FlightLegs)[1])
+sup2 <- 13.4 / (32/dim(FlightLegs)[1])
+sup3 <- 15.5 / (32/dim(FlightLegs)[1])
+
+avg_scale <- (sup1 + sup2 + sup3)/3
+```
+
+Additionally, each of the three error checks sampled `r signif(pct_samp, 3)`% of the flights.  Scaling these estimates up results in `r signif(sup1, 4)` tons CO~2~e, `r signif(sup2, 4)` tons CO~2~e, and `r signif(sup3, 4)` tons CO~2~e respectively, which averages to `r signif(avg_scale, 4)` tons CO~2~e.  In contrast to PIFSC's flight emissions estimations, these values are a lower than the calculated total of `r signif(FlightEmissions,4)` tons CO~2~e.  However, the one-to-one comparisons agree, so the discrepancy in scaling up the subsets could be related to sampling a disproportionate number of short trips.
+
+## Final estimate
+Accepting the known limitations described above, the final estimate is that in FY23 PIRO's official air travel emitted the equivalent of __`r signif(FlightEmissions,4)` metric tons of CO~2~__.

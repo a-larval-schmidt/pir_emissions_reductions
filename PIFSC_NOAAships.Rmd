@@ -119,3 +119,37 @@ Rainier_fuel <- sum(Rainier_fuel_sheet$...6[9:23],     # Leg 2, March
 # Convert from nautical to statute miles
 Rainier_miles <- Rainier_miles * 1.15
 ```
+
+```{r}
+# Let's estimate things like gallons per mile
+# From Jenni's email, identify the correct days
+Rainier_daily_miles <- rbind(as.matrix(Rainier_miles_sheet$...6[9:23]),   # Leg 2, March
+                     as.matrix(Rainier_miles_sheet$...6[29:31]),  # Leg 3, March
+                     as.matrix(Rainier_miles_sheet$...8[1:21]),   # Leg 3, April
+                     as.matrix(Rainier_miles_sheet$...8[25:30]),  # Leg 4, April
+                     as.matrix(Rainier_miles_sheet$...10[1:13]),  # Leg 4, May
+                     as.matrix(Rainier_miles_sheet$...12[19:30]), # Leg 5/6, June
+                     as.matrix(Rainier_miles_sheet$...14[1:12]),  # Leg 5/6, July
+                     as.matrix(Rainier_miles_sheet$...14[21:31]), # Leg 7, July
+                     as.matrix(Rainier_miles_sheet$...16[1:10]),  # Leg 7, August
+                     as.matrix(Rainier_miles_sheet$...18[4:5]))   # Transit
+
+Rainier_daily_fuel <- rbind(as.matrix(Rainier_fuel_sheet$...6[9:23]),     # Leg 2, March 
+                    as.matrix(Rainier_fuel_sheet$...6[29:31]),    # Leg 3, March
+                    as.matrix(Rainier_fuel_sheet$...8[1:21]),     # Leg 3, April
+                    as.matrix(Rainier_fuel_sheet$...8[25:30]),    # Leg 4, April
+                    as.matrix(Rainier_fuel_sheet$...10[1:13]),    # Leg 4, May
+                    as.matrix(Rainier_fuel_sheet$...12[19:30]),   # Leg 5/6, June
+                    as.matrix(Rainier_fuel_sheet$...14[1:12]),    # Leg 5/6, July
+                    as.matrix(Rainier_fuel_sheet$...14[21:31]),   # Leg 7, July
+                    as.matrix(Rainier_fuel_sheet$...16[1:10]),    # Leg 7, August
+                    as.matrix(Rainier_fuel_sheet$...18[4:5]))     # Transit
+
+GallonsPerMile <- Rainier_daily_fuel/Rainier_daily_miles
+GallonsPerMile <- GallonsPerMile[which(is.finite(GallonsPerMile) == TRUE)]  #Dividing by zero is mathematically problematic
+
+AvgGalPerMile <- mean(GallonsPerMile)
+
+# Gallons per mile * 20 nm roundtrip * 22 lbs per gallon / 2205 lbs in a metric ton
+EmissionsSaved <- AvgGalPerMile * 20 * 22 / 2205
+```

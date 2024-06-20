@@ -153,3 +153,37 @@ AvgGalPerMile <- mean(GallonsPerMile)
 # Gallons per mile * 20 nm roundtrip * 22 lbs per gallon / 2205 lbs in a metric ton
 EmissionsSaved <- AvgGalPerMile * 20 * 22 / 2205
 ```
+
+```{r}
+# Looking at data from the Lasker.  Even though it's not from FY23, their Ops had some handy insights 
+# It would be cool if we could quantify them.
+
+# Load data
+HICEAS1 <- read_xlsx(here("Data", "HICEAS Reuben Lasker Fuel Efficiency Tracker.xlsx"),
+                   sheet = "HICEAS 2023 Leg 1", skip = 1)
+
+HICEAS2 <- read_xlsx(here("Data", "HICEAS Reuben Lasker Fuel Efficiency Tracker.xlsx"),
+                   sheet = "HICEAS 2023 Leg 2", skip = 1)
+
+Lasker_Miles <- rbind(as.matrix(HICEAS1$Miles), 
+                      as.matrix(HICEAS2$Miles))
+Lasker_Gallons <- rbind(as.matrix(HICEAS1$Gallons), 
+                        as.matrix(HICEAS2$Gallons))
+
+Lasker_GallonsPerMile <- Lasker_Gallons/Lasker_Miles
+
+```
+
+```{r}
+# Count days at sea to estimate max savings of dropping one generator
+Sette_Days <- sum(Sette_PIFSC$`Days in Range`)
+Rainier_Days <- as.numeric(dim(Rainier_daily_miles)[1])
+
+# Very rough estimate from the Sette's 'Ship Energy Efficiency Management Plan'
+# is that going down by a single generator saves maybe 5 gal per hour
+# 5 gallons per hour * 24 hours in a day * # of days
+FuelSvgMax <- (Sette_Days + Rainier_Days) * 5 * 24
+
+# 22 lbs per gallon / 2205 lbs in a metric ton
+EmissingsSvgMax <- FuelSvgMax * 22 / 2205
+```

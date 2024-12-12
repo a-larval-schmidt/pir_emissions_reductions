@@ -1,0 +1,104 @@
+---
+title: "EmissionsInContext"
+author: "phoebe.woodworth-jefcoats@noaa.gov"
+date: "2024-12-12"
+output: html_document
+---
+
+This script documents and calculates the values in the Tech Memo's section that 
+puts our emissions in a larger context.
+
+```{r, echo = FALSE, message = FALSE}
+# Set up the environment
+library(tidyverse)
+library(here)
+```
+
+```{r}
+# Total and per capita emissions, from tech memo, in metric tons
+PIR_emissions <- 6556.9 
+PIR_percapita <- 22.5
+```
+
+```{r}
+# State of Hawaiʻi emissions, in metric toms
+HI_emissions <- 20.2e6 
+HI_percapita <- 14.0
+```
+
+
+```{r}
+# Values from World Bank data on countries':
+# per capita emissions in t
+# total emissions in kt
+
+# Load data
+WB_perCapita <- read_csv(here('Data', 'WorldBank', 'API_EN.ATM.CO2E.PC_DS2_en_csv_v2_637766.csv'), skip = 4,
+                         show_col_type = FALSE)
+WB_kt <- read_csv(here('Data', 'WorldBank', 'API_EN.ATM.CO2E.KT_DS2_en_csv_v2_637561.csv'), skip = 4,
+                  show_col_types = FALSE)
+
+# Condense down to just 2020
+WB_perCapita_2020 <- WB_perCapita |> select(`Country Name`, `2020`)
+WB_kt_2020 <- WB_kt |> select(`Country Name`, `2020`)
+
+# Sort by 2020 value
+WB_perCapita_2020_ranked <- arrange(WB_perCapita_2020, `2020`)
+WB_kt_2020_ranked <- arrange(WB_kt_2020, `2020`)
+
+# Lowest emitting countries
+head(WB_kt_2020_ranked)
+
+# Per capita
+PIsmall <- WB_perCapita_2020_ranked |>
+  filter(`Country Name` == 'Pacific island small states')
+PIsmall
+PIratio <- PIR_percapita/PIsmall$`2020`[1]
+
+GT_PIR <- which(WB_perCapita_2020_ranked$`2020` > PIR_percapita)
+WB_perCapita_2020_ranked[GT_PIR,]
+
+US <- WB_perCapita_2020_ranked |>
+  filter(`Country Name` == 'United States')
+US
+USratio <- PIR_percapita/US$`2020`[1]
+
+HIratio <- PIR_percapita/HI_percapita
+```
+```{r}
+# Volume of emissions
+# derived using the ideal gas law: PV = nRT
+P = 1 #atm
+R = 0.0821 #L atm mol-1 K-1
+T_std = 273.15 #K (0C)
+T_room = 293.15 #K (20C)
+
+CO2_mol = 12.011 + 2*15.9994 #g mol-1
+n = 1e6 / CO2_mol #mol per ton CO2 (1e6 g per ton)
+
+V_1ton_room_L <- (n * R * T_room) / P #L
+V_1ton_room_m3 <- V_1ton_room_L * 0.001 #m3 (1 L = 0.001 m3)
+V_PI_room_m3 <- V_1ton_room_m3 * PIR_emissions
+Cube_edge <- V_PI_room_m3^(1/3)
+```
+
+```{r}
+# Warming influence
+# 1000 Gt CO2e = +0.45°C (IPCC)
+# 1000 Gt = 1e12 t
+PI_warming <- (PIR_emissions * 0.45) / 1e12
+```
+
+For Tech Memo:
+Is 6,556.9 metric tons CO~2~, or 22.5 metric tons CO~2~e per employee, a lot?  Here are some ways to put these values in context:  
+
+* In total, our operational emissions are comparable to that of the lowest-emitting 
+Pacific Island nation, Tuvalu, and contribute roughly `r signif(PIR_emissions/HI_emissions*100, 1)`% 
+of the total State of Hawaiʻi emissions (World Bank 2024a, State of Hawaiʻi 2024).  
+* Per capita, our emissions are `r signif(PIratio, 2)` times 
+those of Pacific Islands Small States, roughly `r signif(mean(c(USratio, HIratio)), 3)` 
+times the average emissions from both the United States and the State of Hawaiʻi, 
+and greater than all but a single nation globally (World Bank 2024b, State of Hawaiʻi 2024).  
+* Our FY23 emissions would occupy `r signif(V_PI_room_m3/1e6, 3)` million cubic 
+meters at room temperature, which is a cube that’s roughly `r signif(Cube_edge, 2)` meters on each side.  
+* The warming influence of our FY23 operational emissions is `r signif(PI_warming*1e9, 3)` $\times$ 10^-^^9^ °C (IPCC 2023).

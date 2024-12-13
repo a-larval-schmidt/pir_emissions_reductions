@@ -16,7 +16,7 @@ library(here)
 
 ```{r}
 # Total and per capita emissions, from tech memo, in metric tons
-PIR_emissions <- 6556.9 
+PIR_emissions <- 6557.2 
 PIR_percapita <- 22.5
 ```
 
@@ -90,7 +90,7 @@ PI_warming <- (PIR_emissions * 0.45) / 1e12
 ```
 
 For Tech Memo:
-Is 6,556.9 metric tons CO~2~, or 22.5 metric tons CO~2~e per employee, a lot?  Here are some ways to put these values in context:  
+Is 6,557.2 metric tons CO~2~, or 22.5 metric tons CO~2~e per employee, a lot?  Here are some ways to put these values in context:  
 
 * In total, our operational emissions are comparable to that of the lowest-emitting 
 Pacific Island nation, Tuvalu, and contribute roughly `r signif(PIR_emissions/HI_emissions*100, 1)`% 

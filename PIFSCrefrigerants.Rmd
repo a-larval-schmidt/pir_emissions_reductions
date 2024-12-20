@@ -1,0 +1,143 @@
+---
+title: "PIFSCrefrigerants"
+output: html_document
+date: "2024-08-03"
+---
+
+# PIFSC refrigerators and freezers
+PIFSC has a number of refrigerators, freezers, and other appliances that use refrigerants.  
+
+## Methods
+This section describes the methods used to estimate the emissions from PIFSC refrigerant usage, which follow those in the US EPA’s calculator tool.
+
+### Data Gathering, Wrangling, and Assumptions
+A list of cold storage units and other appliances that use refrigeration was provided by Kerry Reardon (Kerry.Reardon@noaa.gov).  This information is accessible via Google Drive and a copy has been added to our Data folder as both a Google Sheet and Excel spreadsheet (to make analysis easier).
+
+```{r, include = FALSE}
+# Set environment
+library(tidyverse)
+library(readxl)
+library(here)
+library(lubridate)
+library(tidyxl)
+```
+
+```{r, include = FALSE}
+# Load data
+Refrigerators <- read_xlsx(here("Data", "Copy of List of cold storage units and large appliances 2024.07.30.xlsx"), 
+                           sheet = "Cold Storage")
+Reefers_with <- filter(Refrigerators, !is.na(Refrigerant))
+
+MiscApps <- read_xlsx(here("Data", "Copy of List of cold storage units and large appliances 2024.07.30.xlsx"), 
+                           sheet = "MISC large appliances")
+MiscApps_with <- MiscApps |> filter(if_all(everything(), ~!is.na(Refrigerant)))
+```
+
+```{r, echo = FALSE}
+# Identify all refrigerants used and assign their global warming potential (GWP)
+Refs_reefers_1 <- unique(Reefers_with$Refrigerant)
+Refs_misc_1 <- unique(MiscApps_with$Refrigerant)
+Refs_used_1 <- unique(c(Refs_reefers_1, Refs_misc_1))
+
+# Some units use multiple refrigerants.
+# We're going to break these into duplicate entries with each refrigerant listed separately
+Mult_1 <- which(Reefers_with$Refrigerant == "R404A, R170, R508B")
+Mult_1_R404A <- Reefers_with[Mult_1,]
+Mult_1_R404A$Refrigerant <- "R404A"
+Mult_1_R170 <- Reefers_with[Mult_1,]
+Mult_1_R170$Refrigerant <- "R170"
+Mult_1_R508B <- Reefers_with[Mult_1,]
+Mult_1_R508B$Refrigerant <- "R508B"
+Reefers_single_round1 <- Reefers_with[-Mult_1,]
+Reefers_single_round1 <- bind_rows(Reefers_single_round1, Mult_1_R404A, Mult_1_R170, Mult_1_R508B)
+
+Mult_2 <- which(Reefers_single_round1$Refrigerant == "R134A, R404A, R170, R508B")
+Mult_2_R134A <- Reefers_single_round1[Mult_2,]
+Mult_2_R134A$Refrigerant <- "R134A"
+Mult_2_R404A <- Reefers_single_round1[Mult_2,]
+Mult_2_R404A$Refrigerant <- "R404A"
+Mult_2_R170 <- Reefers_single_round1[Mult_2,]
+Mult_2_R170$Refrigerant <- "R170"
+Mult_2_R508B <- Reefers_single_round1[Mult_2,]
+Mult_2_R508B$Refrigerant <- "R508B"
+
+Reefers_single <- Reefers_single_round1[-Mult_2,]
+Reefers_single <- bind_rows(Reefers_single, Mult_2_R134A, Mult_2_R404A, Mult_2_R170, Mult_2_R508B)
+
+# Confirm each entry only has one refrigerant and identify unique refrigerants
+Refs_reefers <- unique(Reefers_single$Refrigerant)
+Refs_misc <- unique(MiscApps_with$Refrigerant)
+Refs_used <- unique(c(Refs_reefers, Refs_misc))
+
+# Build a reference table in Excel so there's a record and it can be loaded in
+```
+
+```{r, echo = FALSE}
+# Let's clean up to avoid mistakes
+# Comment this out or edit it if you want to preserve more or different variables
+rm(list=ls()[! ls() %in% c("Reefers_single", "MiscApps_with")])
+```
+
+
+```{r, echo = FALSE}
+# Read in the refrigerant GWP info
+RefrigerantGWP <- read_csv(here("Data", "RefrigerantGWP.csv"),
+                           show_col_types = FALSE)
+```
+
+```{r, echo = FALSE}
+# Calculate emissions for each category of refrigerator
+
+# Domestic Refrigeration
+Domestic_Reefers <- Reefers_single |> filter(Type != "Ultra Freezer" & (Note != "Commercial" | is.na(Note)))
+# Add a column with the refrigerant GWP, to make summing across units easier
+Domestic_Reefers_GWP <- full_join(Domestic_Reefers, RefrigerantGWP, by = "Refrigerant")
+Domestic_Reefers_GWP <- Domestic_Reefers_GWP |> filter(!is.na(Type))
+# Sort out mini fridges and mini freezers, NAs are a pain...
+Mini_detect <- str_detect(Domestic_Reefers_GWP$Note, fixed('mini', ignore_case = TRUE))
+Mini_idx <- which(Mini_detect == 'TRUE')
+Reg_idx <- which(Mini_detect == 'FALSE' | is.na(Mini_detect))
+Domestic_Reefers_GWP_minis <- Domestic_Reefers_GWP[Mini_idx,]
+Domestic_Reefers_GWP_reg <- Domestic_Reefers_GWP[Reg_idx,]
+DR_OppCap_mini <- unname(quantile(c(0.05,0.5)))[2]  # 'unname' removes the quantile names, the second is 25%
+DR_OppCap_reg <- (0.05 + 0.5) / 2  # Operating capacity
+DR_emissions_mini <- sum(DR_OppCap_mini * (0.5 / 100) * Domestic_Reefers_GWP_minis$GWP)/1000
+DR_emissions_reg <- sum(DR_OppCap_reg * (0.5 / 100) * Domestic_Reefers_GWP_reg$GWP)/1000
+DR_emissions <- DR_emissions_mini + DR_emissions_reg
+
+# Stand-Alone Commercial
+Commercial_Reefers <- Reefers_single |> filter(Type == "Ultra Freezer" | Note == "Commercial")
+# Add a column with the refrigerant GWP, to make summing across units easier
+Commercial_Reefers_GWP <- full_join(Commercial_Reefers, RefrigerantGWP, by = "Refrigerant")
+Commercial_Reefers_GWP <- Commercial_Reefers_GWP |> filter(!is.na(Type))
+CR_OppCap <- (0.2 + 6) / 2
+CR_emissions <- sum(CR_OppCap * (15/100) * Commercial_Reefers_GWP$GWP)/1000
+
+# Air conditioner (residential/commercial/AC)
+AC <- MiscApps_with |> filter(Note == "Back-up Air conditioning unit")
+# Add a column with the refrigerant GWP, to make summing across units easier
+AC_GWP <- full_join(AC, RefrigerantGWP, by = "Refrigerant")
+AC_GWP <- AC_GWP |> filter(!is.na(Type))
+AC_OppCap <- 0.5
+AC_emissions <- (AC_OppCap * (10/100) * AC_GWP$GWP)/1000
+
+# Dehumidifiers (domestic refrigeration)
+Dehumid <- MiscApps_with |> filter(Note == "Dehumidifier")
+# Add a column with the refrigerant GWP, to make summing across units easier
+Dehumid_GWP <- full_join(Dehumid, RefrigerantGWP, by = "Refrigerant")
+Dehumid_GWP <- Dehumid_GWP |> filter(!is.na(Type))
+DH_OppCap <- 0.05
+DH_emissions <- sum(DH_OppCap * (0.5 / 100) * Dehumid_GWP$GWP)/1000
+
+# Ice makers (stand-alone commercial)
+IceMaker <- MiscApps_with |> filter(Note == "Ice Maker")
+# Add a column with the refrigerant GWP, to make summing across units easier
+IceMaker_GWP <- full_join(IceMaker, RefrigerantGWP, by = "Refrigerant")
+IceMaker_GWP <- IceMaker_GWP |> filter(!is.na(Type))
+IM_OppCap <- 0.2
+IM_emissions <- (IM_OppCap * (15/100) * IceMaker_GWP$GWP)/1000
+
+# Sum across categories
+Reefer_Emissions <- DR_emissions + CR_emissions + AC_emissions + DH_emissions
+```
+

@@ -1,0 +1,12 @@
+﻿Refrigerant,GWP,Source
+R134A," 1,430 ",Calculator Tool (see Methods assumptions)
+R600a,1,Technology Transitions GWP Reference Table
+R290,3.3,Technology Transitions GWP Reference Table
+Ethane,5.5,Technology Transitions GWP Reference Table
+R600A,1,Technology Transitions GWP Reference Table
+R404,"3,922",Calculator Tool (see Methods assumptions)
+R404A,"3,922",Calculator Tool
+R170,5.5,Technology Transitions GWP Reference Table
+R508B,"13,396",Calculator Tool
+R-410A,"2,088",Calculator Tool
+R-410,"2,088",Calculator Tool (see Methods assumptions)

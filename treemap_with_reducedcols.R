@@ -1,0 +1,56 @@
+title: "SummaryReport_Treemap"
+output: html_document
+date: "2024-09-11"
+---
+  
+  ```{r, echo = FALSE, message = FALSE}
+# Set up the environment
+library(tidyverse)
+library(here)
+library(viridis)
+library(treemapify)
+library(ggraph)
+library(igraph)
+```
+
+```{r, echo = FALSE, message = FALSE}
+# Load data
+Emissions <- read_csv("Emissions_DataViz.csv", show_col_types = FALSE)
+
+# Remove summary row
+Emissions <- Emissions[-14,]
+```
+colSums(Emissions[,c(2,5)],na.rm=T)
+(13114-1833)/13114
+1-.14
+Emissions$Tons
+```{r, echo = FALSE}
+# Version with labels & legend, so we know which color goes with which category
+m <- ggplot(Emissions, aes(area = Tons, fill = Category, label = Category)) + 
+  geom_treemap() + 
+  scale_fill_viridis(discrete = TRUE, option = "mako") +
+  geom_treemap_text(colour = "white", place = "centre", grow = FALSE)
+
+r<- ggplot(Emissions, aes(area = reduced_tons, fill = Category, label = Category)) + 
+  geom_treemap() + 
+  scale_fill_viridis(discrete = TRUE, option = "mako") +
+  geom_treemap_text(colour = "white", place = "centre", grow = FALSE)
+r
+# Uncomment lines above and below "m" to save figure
+# pdf('EmissionsTreeMap.pdf')
+m
+# dev.off()
+
+# Version without legend, for cleaner figure
+# Will add details in Adobe Illustrator
+m_nolabel <- ggplot(Emissions, aes(area = Tons, fill = Category, label = Category)) + 
+  geom_treemap() + 
+  scale_fill_viridis(discrete = TRUE, option = "mako") +
+  geom_treemap_text(colour = "white", place = "centre", grow = FALSE) + 
+  theme(legend.position = "none")
+
+# Uncomment lines above and below "m_nolabel" to save figure
+# pdf('EmissionsTreeMap_noLegend_wide.pdf', width = 6, height = 4)
+m_nolabel
+# dev.off()
+```

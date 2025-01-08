@@ -1,0 +1,15 @@
+﻿Category,Tons,Scope,PerCapitaDivisor,reduced_tons
+PIFSCvehicles ,11.6,1,197,11.6
+PIROvehicles ,9.8,1,95,9.8
+PIFSCships ,2592.8,1,197,674.128
+PIFSCboats ,6,1,197,6
+PIFSCforklift ,0.6,1,197,0.6
+PIFSCairtravel ,221.1,3,197,221.1
+PIROairtravel ,145,3,95,145
+PIFSCcharters ,568.6,3,197,147.836
+PIFSCcommuting ,251.9,3,197,251.9
+PIROcommuting ,122.7,3,95,122.7
+IRCdieselgenerators,0.9,1,292,0.9
+PIFSCrefrigerants,82,1,197,82
+IRCelectricty,2544.2,2,292,160.2846
+,6557.2,,,

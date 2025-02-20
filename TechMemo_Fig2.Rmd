@@ -1,0 +1,66 @@
+---
+title: "Figure1"
+author: "phoebe.woodworth-jefcoats@noaa.gov"
+date: "2024-12-12"
+output: html_document
+---
+
+This is the code used to create Figure 1 in our tech memo, which is the emissions
+treemap. 
+
+```{r, echo = FALSE, message = FALSE}
+# Set up the environment
+library(tidyverse)
+library(here)
+library(viridis)
+library(treemapify)
+```
+
+```{r, echo = FALSE, message = FALSE}
+# Load data
+Emissions <- read_csv("Emissions_DataViz.csv", show_col_types = FALSE)
+
+# Remove summary row
+Emissions <- Emissions[-14,]
+```
+
+```{r, echo = FALSE, message = FALSE}
+# Adding a row to account for avoided emissions
+# This is done so that the treemap boxes scale accurately
+# Note that adding a row/category changes the colormap slightly
+# The colors were matched to Fig. 1 in Adobe Illustrator
+Emissions <- add_row(Emissions, 
+                     Category = 'Avoided', 
+                     Tons = 0, 
+                     Scope = 0, 
+                     PerCapitaDivisor = 292, 
+                     ReducedTons = sum(Emissions$Tons[1:13]) - sum(Emissions$ReducedTons[1:13]),
+                     ReductionExplanation = NA)
+```
+
+
+```{r, echo = FALSE}
+# Version with labels & legend, so we know which color goes with which category
+m <- ggplot(Emissions, aes(area = ReducedTons, fill = Category, label = Category)) + 
+  geom_treemap() + 
+  scale_fill_viridis(discrete = TRUE, option = "mako") +
+  geom_treemap_text(colour = "white", place = "centre", grow = FALSE)
+
+# Uncomment lines above and below "m" to save figure
+# pdf('TechMemo_Fig2.pdf')
+m
+# dev.off()
+
+# Version without legend, for cleaner figure
+# Will add details in Adobe Illustrator
+m_nolabel <- ggplot(Emissions, aes(area = ReducedTons, fill = Category, label = Category)) + 
+  geom_treemap() + 
+  scale_fill_viridis(discrete = TRUE, option = "mako") +
+  geom_treemap_text(colour = "white", place = "centre", grow = FALSE) + 
+  theme(legend.position = "none")
+
+# Uncomment lines above and below "m_nolabel" to save figure
+# pdf('TechMemo_Fig2_noLegend_wide.pdf', width = 6, height = 4)
+m_nolabel
+# dev.off()
+```

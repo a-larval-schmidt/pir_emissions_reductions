@@ -1,11 +1,11 @@
 ---
-title: "Figure1"
+title: "Figure2"
 author: "phoebe.woodworth-jefcoats@noaa.gov"
 date: "2024-12-12"
 output: html_document
 ---
 
-This is the code used to create Figure 1 in our tech memo, which is the emissions
+This is the code used to create Figure 2 in our tech memo, which is the emissions
 treemap. 
 
 ```{r, echo = FALSE, message = FALSE}

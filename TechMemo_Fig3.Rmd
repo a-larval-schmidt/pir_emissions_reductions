@@ -1,0 +1,41 @@
+---
+title: "Figure3"
+author: "phoebe.woodworth-jefcoats@noaa.gov"
+date: "2024-12-12"
+output: html_document
+---
+
+This is the code used to create Figure 3 in our tech memo, which is the savings 
+from specific actions. 
+
+```{r, echo = FALSE, message = FALSE}
+# Set up the environment
+library(tidyverse)
+library(here)
+library(viridis)
+```
+
+```{r, echo = FALSE, message = FALSE}
+# Load data
+Emissions <- read_csv("EmissionsReductions_DataViz.csv", show_col_types = FALSE)
+
+# Sort so the actions plot in order from greatest savings to least
+Emissions <- arrange(Emissions, `Savings (metric tons)`)
+```
+
+```{r, echo = FALSE}
+# Horizontal barplot, will tidy up in Illustrator
+# Transparent background to comport with PIFSC requirements
+# Note that the bar labels print in their entirety in Illustrator
+
+# Uncomment the pdf and dev.off lines to save figure
+pdf("TechMemo_Fig3.pdf", width = 6, height = 4, bg = "transparent")
+barplot(Emissions$`Savings (metric tons)`, horiz = TRUE, 
+        names.arg = Emissions$Action, las = 1, # print labels horizontally
+        col = "#C2D9E3", # NMFS sky tint 1
+        axes = FALSE, 
+        border = NA)
+axis((1), at = c(seq(0, 1.5, 0.5), 1.6))
+title(xlab = "Metric tons (t) CO2e")
+dev.off()
+```

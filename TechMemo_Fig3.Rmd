@@ -29,7 +29,7 @@ Emissions <- arrange(Emissions, `Savings (metric tons)`)
 # Note that the bar labels print in their entirety in Illustrator
 
 # Uncomment the pdf and dev.off lines to save figure
-pdf("TechMemo_Fig3.pdf", width = 6, height = 4, bg = "transparent")
+pdf("TechMemo_Fig3_rev.pdf", width = 6, height = 4, bg = "transparent")
 barplot(Emissions$`Savings (metric tons)`, horiz = TRUE, 
         names.arg = Emissions$Action, las = 1, # print labels horizontally
         col = "#C2D9E3", # NMFS sky tint 1
